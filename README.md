@@ -1,11 +1,6 @@
-## My Project
+## Automated Deployment of AWS Resources for healthcare reports data extraction solution Using AWS CloudFormation
 
-TODO: Fill this README out!
-
-Be sure to:
-
-* Change the title in this README
-* Edit your repository description on GitHub
+This repository contains the sample CloudFormation template for the AWS  blog post - Automate email attachment storage and processing in healthcare. The template provisions required AWS Services ( Lambda functions, DynamoDB Tabes, SNS Topics, S3 buckets, SES) for the solution. 
 
 ## Security
 
