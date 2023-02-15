@@ -492,7 +492,7 @@ Resources:
                         print("TEXTRACT_NOTIFICATION_ROLE_ARN: " + TEXTRACT_NOTIFICATION_ROLE_ARN)
           
                         s3.put_object(Bucket=ATTACHMENTS_BUCKET, Key=attachment_key, Body=part.get_content())
-						documentnamelist += part.get_filename() + "," 
+			documentnamelist += part.get_filename() + "," 
                         response = textract.start_document_analysis(    
                             DocumentLocation={
                                 'S3Object': {
