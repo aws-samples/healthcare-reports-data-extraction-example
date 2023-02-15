@@ -428,118 +428,112 @@ Resources:
         - Arn
       Code:
         ZipFile: |      
-            import email
-            import json
-            import os
-            from email import policy
-            import re
-            from datetime import datetime
-            import boto3
-            EMAILS_DYNAMO_TABLE = os.environ['EMAILS_DYNAMO_TABLE']
-            ATTACHMENTS_BUCKET = os.environ['ATTACHMENTS_BUCKET']
-            TEXTRACT_NOTIFICATION_TOPIC_ARN = os.environ['TEXTRACT_NOTIFICATION_TOPIC_ARN']
-            TEXTRACT_NOTIFICATION_ROLE_ARN = os.environ['TEXTRACT_NOTIFICATION_ROLE_ARN']
-            def lambda_handler(sns_payload, context):
-                s3 = boto3.client('s3')			
-                textract = boto3.client('textract')
-                dynamodb = boto3.client('dynamodb') 				
-                print(json.dumps(sns_payload))
-                if 'Records' not in sns_payload:
-                    raise Exception('No Records section')
-                if len(sns_payload['Records']) != 1:
-                    raise Exception('Expected only 1 record')
-                sns_message = sns_payload['Records'][0]['Sns']['Message']
-                event = json.loads(sns_message)
-                if 'action' not in event['receipt']:
-                    raise Exception("Invalid event, expected action section")
-                sourceemail = event['mail']['source']               
-                if "=" in sourceemail:
-                    sourceemail = sourceemail.split("=")
-                    sourceemail = sourceemail[2]      
-                documentnamelist = ""         
-                action = event['receipt']['action']
-                actionType = action['type']
-                if actionType != 'S3':
-                    raise Exception("Expected action type to be S3, got: " + actionType)
-                bucket_name = action['bucketName']
-                object_key = action['objectKey']
-                email_id = object_key
-                print("Bucket name: " + bucket_name)
-                print("Object key: " + object_key)
-                s3_raw_email = s3.get_object(Bucket=bucket_name, Key=object_key)
-                raw_email_str = s3_raw_email['Body'].read().decode('utf-8')
-                raw_email = email.parser.Parser(policy=policy.strict).parsestr(raw_email_str) 
-                source = "Email from  " + sourceemail
-                now = datetime.now()
-                dt_string = now.strftime("%d/%m/%Y %H:%M:%S")    
-                attachment_index = 0
-                attachments = []
-                for part in raw_email.walk():
-                    if part.is_attachment():
-                        if len(part.get_filename()):
-                            attachment_key = object_key + "/attachments/" + re.sub(r'[^a-zA-Z0-9]','',part.get_filename())
-                            job_tag = email_id[0:5] + "_" + re.sub(r'[^a-zA-Z0-9]','',attachment_id)
-                            attachment_index += 1
-                        else:
-                            attachment_id = str(attachment_index)
-                            attachment_key = object_key + "/attachments/" + attachment_id
-                            job_tag = email_id[0:5] + "_" + attachment_id
-                            attachment_index += 1 	                   
-                        print("Job tag: " + job_tag)
-                        print("ATTACHMENTS_BUCKET: " + ATTACHMENTS_BUCKET)
-                        print("attachment_key: " + attachment_key)
-                        print("TEXTRACT_NOTIFICATION_TOPIC_ARN: " + TEXTRACT_NOTIFICATION_TOPIC_ARN)
-                        print("TEXTRACT_NOTIFICATION_ROLE_ARN: " + TEXTRACT_NOTIFICATION_ROLE_ARN)          
-                        s3.put_object(Bucket=ATTACHMENTS_BUCKET, Key=attachment_key, Body=part.get_content())
-			documentnamelist += part.get_filename() + "," 
-                        response = textract.start_document_analysis(    
-                            DocumentLocation={
-                                'S3Object': {
-                                    'Bucket': ATTACHMENTS_BUCKET,
-                                    'Name': attachment_key
-                                }
-                            },
-                            FeatureTypes=['FORMS', 'TABLES'],
-                            JobTag=job_tag,
-                            NotificationChannel={
-                                'SNSTopicArn': TEXTRACT_NOTIFICATION_TOPIC_ARN,
-                                'RoleArn': TEXTRACT_NOTIFICATION_ROLE_ARN
-                            }
-                        )
-                        attachments.append({
-                            'attachment_id': attachment_id,
-                            'content_type': part.get_content_type(),
-                            'key': attachment_key,
-                            'textract_job_id': response['JobId']
-                        })
-                item = {
-                    "email_id": {
-                        "S": email_id
-                    },
-                    "subject": {
-                        "S": raw_email['subject']
-                    },
-                    "source": {
-                        "S": source
-                    },
-                    "documentname": {
-                        "S": documentnamelist[0:-1]
-                    },
-                    "timestamp": {
-                        "S": dt_string
-                    }   
-                }
-                dynamodb.put_item(
-                    TableName=EMAILS_DYNAMO_TABLE,
-                    Item=item,
-                    ReturnValues='NONE'
-                )						
-                response = {
-                    'email_id': email_id,
-                    'attachments': attachments
-                }
-                print(str(response))
-                return response      
+			import email
+			import json
+			import os
+			from email import policy
+			import re
+			from datetime import datetime
+
+			import boto3
+
+			EMAILS_DYNAMO_TABLE = os.environ['EMAILS_DYNAMO_TABLE']
+			ATTACHMENTS_BUCKET = os.environ['ATTACHMENTS_BUCKET']
+			TEXTRACT_NOTIFICATION_TOPIC_ARN = \
+				os.environ['TEXTRACT_NOTIFICATION_TOPIC_ARN']
+			TEXTRACT_NOTIFICATION_ROLE_ARN = \
+				os.environ['TEXTRACT_NOTIFICATION_ROLE_ARN']
+
+
+			def lambda_handler(sns_payload, context):
+				s3 = boto3.client('s3')
+				textract = boto3.client('textract')
+				dynamodb = boto3.client('dynamodb')
+
+				if 'Records' not in sns_payload:
+					raise Exception('No Records section')
+
+				if len(sns_payload['Records']) != 1:
+					raise Exception('Expected only 1 record')
+
+				sns_message = sns_payload['Records'][0]['Sns']['Message']
+				event = json.loads(sns_message)
+
+				if 'action' not in event['receipt']:
+					raise Exception('Invalid event, expected action section')
+
+				sourceemail = event['mail']['source']
+
+				if '=' in sourceemail:
+					sourceemail = sourceemail.split('=')
+					sourceemail = sourceemail[2]
+				documentnamelist = ''
+				action = event['receipt']['action']
+
+				actionType = action['type']
+				if actionType != 'S3':
+					raise Exception('Expected action type to be S3, got: '
+									+ actionType)
+
+				bucket_name = action['bucketName']
+				object_key = action['objectKey']
+				email_id = object_key
+
+				s3_raw_email = s3.get_object(Bucket=bucket_name, Key=object_key)
+
+				raw_email_str = s3_raw_email['Body'].read().decode('utf-8')
+				raw_email = \
+					email.parser.Parser(policy=policy.strict).parsestr(raw_email_str)
+
+				source = 'Email from  ' + sourceemail
+				now = datetime.now()
+				dt_string = now.strftime('%d/%m/%Y %H:%M:%S')
+				attachment_index = 0
+				attachments = []
+				for part in raw_email.walk():
+					if part.is_attachment():
+						if len(part.get_filename()):
+							attachment_key = object_key + '/attachments/' \
+								+ re.sub(r'[^a-zA-Z0-9]', '', part.get_filename())
+							job_tag = email_id[0:5] + '_' + re.sub(r'[^a-zA-Z0-9]',
+									'', part.get_filename())
+							attachment_index += 1
+						else:
+							attachment_id = str(attachment_index)
+							attachment_key = object_key + '/attachments/' \
+								+ attachment_id
+							job_tag = email_id[0:5] + '_' + attachment_id
+							attachment_index += 1
+
+						s3.put_object(Bucket=ATTACHMENTS_BUCKET,
+									  Key=attachment_key, Body=part.get_content())
+						documentnamelist += part.get_filename() + ','
+
+						response = \
+							textract.start_document_analysis(DocumentLocation={'S3Object': {'Bucket': ATTACHMENTS_BUCKET,
+								'Name': attachment_key}}, FeatureTypes=['FORMS',
+								'TABLES'], JobTag=job_tag,
+								NotificationChannel={'SNSTopicArn': TEXTRACT_NOTIFICATION_TOPIC_ARN,
+								'RoleArn': TEXTRACT_NOTIFICATION_ROLE_ARN})
+
+						attachments.append({
+							'attachment_id': part.get_filename(),
+							'content_type': part.get_content_type(),
+							'key': attachment_key,
+							'textract_job_id': response['JobId'],
+							})
+						item = {
+							'email_id': {'S': email_id},
+							'subject': {'S': raw_email['subject']},
+							'source': {'S': source},
+							'documentname': {'S': documentnamelist[0:-1]},
+							'timestamp': {'S': dt_string},
+							}
+						dynamodb.put_item(TableName=EMAILS_DYNAMO_TABLE, Item=item,
+										  ReturnValues='NONE')
+				response = {'email_id': email_id, 'attachments': attachments}
+				return response
+		
       Environment:
         Variables:
           EMAILS_DYNAMO_TABLE:
