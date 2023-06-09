@@ -30,7 +30,6 @@ Resources:
               ServerSideEncryptionConfiguration:
                - ServerSideEncryptionByDefault:
                   SSEAlgorithm: AES256
-      AccessControl: BucketOwnerFullControl
       LoggingConfiguration:
         DestinationBucketName: !Ref S3BucketLogs
         LogFilePrefix: !Sub '/logs/!Sub textract-demo-docupload-${AWS::Region}-${AWS::AccountId}/'       
@@ -74,7 +73,6 @@ Resources:
     DeletionPolicy: Retain
     Properties:
       BucketName: !Sub textract-demo-access-logs-${AWS::Region}-${AWS::AccountId}
-      AccessControl: LogDeliveryWrite
       BucketEncryption:
               ServerSideEncryptionConfiguration:
                - ServerSideEncryptionByDefault:
